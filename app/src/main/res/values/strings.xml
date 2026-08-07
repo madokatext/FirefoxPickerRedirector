@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Firefox Picker Redirector</string>
+    <string name="xposed_description">Redirect Firefox file upload and Android photo picker to a chosen file manager.</string>
+</resources>
