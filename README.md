@@ -6,8 +6,8 @@
 
 - 仅 Hook `org.mozilla.firefox`。
 - Firefox 网页 `<input type=file>` 的普通文件选择入口仍保留 Firefox 原本的 MIME、多选等参数，但把目标包限定为你指定的文件管理器。
-- Android Photo Picker（平台、AndroidX/OEM fallback、Google Play services fallback 的 `PICK_IMAGES`）入口会改写成 `ACTION_OPEN_DOCUMENT`，再定向到同一个文件管理器。图片、视频、图片+视频以及多选约束会尽量按 AndroidX 原语义保留。
-- Firefox chooser 中的相机、录像、录音 capture Intent 不改写。
+- 纯图片/视频上传不再定向到第三方文件管理器：Firefox 原本的“文件选择 + 相机/录像” chooser 会被整体替换为系统 `MediaStore.ACTION_PICK_IMAGES` 媒体选择器。
+- 因此照片/视频入口不会再出现“相机 vs 第三方文件管理器”二选一；相机/录像 capture 入口会从这类纯媒体上传中消失。普通文件上传仍定向到配置的文件管理器。
 - 目标文件管理器不存在或不能处理相应 Intent 时，自动保留 Firefox 原行为，避免直接崩溃。
 
 默认目标是 Material Files：`me.zhanghai.android.files`。
