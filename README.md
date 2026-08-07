@@ -41,3 +41,7 @@ Material Files 的 `FileListActivity` 同时声明支持 `ACTION_GET_CONTENT` �
 4. 强制停止并重新打开 Firefox（首次启用模块时需要）。
 
 后续只修改目标包名时不需要重启 Firefox；每次拉起文件选择器前都会重新读取模块设置。
+
+## LSPosed compatibility note
+
+The bundled compile-only Xposed API stub intentionally matches the legacy Xposed API 82 method descriptor for `XposedHelpers.findAndHookMethod`: its return type is `XC_MethodHook.Unhook`. Do not change it to `Object`; JVM method descriptors include the return type, and doing so causes `NoSuchMethodError` on LSPosed before hooks are installed.
