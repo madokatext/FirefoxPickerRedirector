@@ -10,8 +10,6 @@ import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.MediaStore;
 
-import java.util.ArrayList;
-
 import de.robv.android.xposed.XposedBridge;
 
 final class IntentRewriter {
@@ -51,7 +49,13 @@ final class IntentRewriter {
 
             String targetPackage = readTargetPackage(activity);
             if (targetPackage != null && !targetPackage.isEmpty()) {
-                rewriteNonVisualChooser(activity, original, targetPackage, requestCode);
+                Intent filePicker = nonVisualChooserToFileManager(
+                        activity, original, targetPackage, requestCode
+                );
+                if (filePicker != null) {
+                    log("Non-visual upload chooser -> " + describe(filePicker));
+                    return filePicker;
+                }
             }
             return original;
         }
@@ -102,53 +106,57 @@ final class IntentRewriter {
     }
 
     /**
-     * Keep the old custom-file-manager behavior only for non-visual upload choosers.
-     * Capture intents are intentionally left alone here because this branch is not the
-     * dedicated photo/video entry.
+     * Replace the whole non-visual upload chooser with a targeted GET_CONTENT request.
+     * Copy the request to preserve MIME filters, multi-select, extras and URI grants without
+     * modifying the original chooser, which remains the fallback if the target cannot handle it.
      */
     @SuppressWarnings("deprecation")
-    private static void rewriteNonVisualChooser(
+    private static Intent nonVisualChooserToFileManager(
             Activity activity,
             Intent chooser,
             String targetPackage,
             int requestCode
     ) {
-        boolean changed = false;
-
         Intent base = chooser.getParcelableExtra(Intent.EXTRA_INTENT);
-        if (base != null
-                && Intent.ACTION_GET_CONTENT.equals(base.getAction())
-                && isFirefoxUploadGetContent(base, requestCode)
-                && !isVisualOnlySelection(base)) {
-            changed |= forcePackageIfResolvable(activity, base, targetPackage);
-            chooser.putExtra(Intent.EXTRA_INTENT, base);
+        Intent filePicker = nonVisualGetContentToFileManager(
+                activity, base, targetPackage, requestCode
+        );
+        if (filePicker != null) {
+            return filePicker;
         }
 
         Parcelable[] rawInitial = chooser.getParcelableArrayExtra(Intent.EXTRA_INITIAL_INTENTS);
-        if (rawInitial != null && rawInitial.length > 0) {
-            ArrayList<Intent> rewritten = new ArrayList<>(rawInitial.length);
-            boolean initialChanged = false;
+        if (rawInitial != null) {
             for (Parcelable item : rawInitial) {
                 if (!(item instanceof Intent)) {
                     continue;
                 }
-                Intent intent = (Intent) item;
-                if (Intent.ACTION_GET_CONTENT.equals(intent.getAction())
-                        && isFirefoxUploadGetContent(intent, requestCode)
-                        && !isVisualOnlySelection(intent)) {
-                    initialChanged |= forcePackageIfResolvable(activity, intent, targetPackage);
+                filePicker = nonVisualGetContentToFileManager(
+                        activity, (Intent) item, targetPackage, requestCode
+                );
+                if (filePicker != null) {
+                    return filePicker;
                 }
-                rewritten.add(intent);
-            }
-            if (initialChanged) {
-                chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, rewritten.toArray(new Intent[0]));
-                changed = true;
             }
         }
 
-        if (changed) {
-            log("Non-visual upload chooser redirected to " + targetPackage);
+        return null;
+    }
+
+    private static Intent nonVisualGetContentToFileManager(
+            Activity activity,
+            Intent source,
+            String targetPackage,
+            int requestCode
+    ) {
+        if (source == null
+                || !isFirefoxUploadGetContent(source, requestCode)
+                || isVisualOnlySelection(source)) {
+            return null;
         }
+
+        Intent filePicker = new Intent(source);
+        return forcePackageIfResolvable(activity, filePicker, targetPackage) ? filePicker : null;
     }
 
     private static Intent getContentToSystemPhotoPicker(Activity activity, Intent source) {
